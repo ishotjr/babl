@@ -27,6 +27,17 @@
 #include <PDM.h>
 #include <baby_inference.h>
 
+/** LED indication of classification */
+static signed short redPin = 22;
+static signed short greenPin = 23;
+static signed short bluePin = 24;
+
+// TODO: make this 2D/array of colors (classificationColors)
+static signed short classificationRed[] = {255,0,0};
+static signed short classificationGreen[] = {0,255,0};
+static signed short classificationBlue[] = {0,0,255};
+static signed short classificationNone = EI_CLASSIFIER_LABEL_COUNT;
+
 /** Audio buffers, pointers and selectors */
 typedef struct {
     int16_t *buffer;
@@ -48,7 +59,11 @@ void setup()
     // put your setup code here, to run once:
     Serial.begin(115200);
 
-    Serial.println("Edge Impulse Inferencing Demo");
+    Serial.println("BABL Baby Monitor");
+    
+    setLed(classificationRed[classificationNone], 
+           classificationGreen[classificationNone], 
+           classificationBlue[classificationNone]);
 
     // summary of inferencing settings (from model_metadata.h)
     ei_printf("Inferencing settings:\n");
@@ -93,10 +108,20 @@ void loop()
         return;
     }
 
+    // default LED to "none"
+    setLed(classificationRed[classificationNone], 
+           classificationGreen[classificationNone], 
+           classificationBlue[classificationNone]);
+
     // print the predictions
     ei_printf("Predictions (DSP: %d ms., Classification: %d ms., Anomaly: %d ms.): \n",
         result.timing.dsp, result.timing.classification, result.timing.anomaly);
     for (size_t ix = 0; ix < EI_CLASSIFIER_LABEL_COUNT; ix++) {
+
+        // overwrite LED if confident
+        if (result.classification[ix].value > 0.7) {
+            setLed(classificationRed[ix], classificationGreen[ix], classificationBlue[ix]);
+        }
         ei_printf("    %s: %.5f\n", result.classification[ix].label, result.classification[ix].value);
     }
 #if EI_CLASSIFIER_HAS_ANOMALY == 1
@@ -224,3 +249,11 @@ static void microphone_inference_end(void)
 #if !defined(EI_CLASSIFIER_SENSOR) || EI_CLASSIFIER_SENSOR != EI_CLASSIFIER_SENSOR_MICROPHONE
 #error "Invalid model for current sensor."
 #endif
+
+
+void setLed(signed short red, signed short green, signed short blue) {
+  // values are inverted i.e. 255 == off
+  analogWrite(redPin, 255 - red);
+  analogWrite(greenPin, 255 - green);
+  analogWrite(bluePin, 255 - blue);
+}
